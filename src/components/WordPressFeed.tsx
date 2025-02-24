@@ -85,6 +85,7 @@ function WordPressFeed() {
       }
     } else {
       setSelectedPostId(null);
+      setVisiblePostsCount(3); // Reset visiblePostsCount when returning to feed
     }
   }, [posts]); // Added dependency on posts
 
@@ -94,6 +95,9 @@ function WordPressFeed() {
       const urlParams = new URLSearchParams(window.location.search);
       const postId = urlParams.get("p");
       setSelectedPostId(postId);
+      if (!postId) {
+        setVisiblePostsCount(3); // Reset visiblePostsCount when returning to feed
+      }
     };
 
     window.addEventListener("popstate", handlePopState);
