@@ -168,7 +168,7 @@ function WordPressFeed() {
     }
 
     return (
-      <div className="wordpress-post flex flex-col gap-4 m-24 max-w-screen-sm">
+      <div className="wordpress-post flex flex-col gap-4 p-6 max-w-screen-sm m-auto">
         <h1 className="text-4xl text-blue-600 font-bold">
           {selectedPost.title.rendered}
         </h1>
@@ -197,7 +197,7 @@ function WordPressFeed() {
   const visiblePosts = posts.slice(0, visiblePostsCount);
 
   return (
-    <div className="wordpress-feed flex flex-col gap-4 m-24 max-w-screen-sm">
+    <div className="wordpress-feed flex flex-col gap-4 p-6 max-w-screen-sm m-auto">
       <h1 className="text-4xl text-blue-600 font-bold ml-6">WordPress Feed</h1>
       {visiblePosts.map((post, index) => (
         <div key={index} className="bg-gray-200 rounded-lg p-6">
