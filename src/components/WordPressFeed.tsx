@@ -9,21 +9,24 @@ interface Post {
   content: { rendered: string };
 }
 
-let apiUrl = "https://taylorau.com.au";
-apiUrl = "https://test.frontity.org";
+let apiUrl = ""
 apiUrl = `https://marina-services.com/wordpress/`;
-const pageSize = 6; // Fetch 6 posts initially
+let pageSize = 6; // Fetch 6 posts initially
+const postsToShow = 3;
+let postsToShowAdjust = 1;
+let postsPageNumber = 1;
 
 function WordPressFeed() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
+  const [pageNumber, setPageNumber] = useState(2);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [fetchingSpecificPost, setFetchingSpecificPost] = useState(false);
-  const [visiblePostsCount, setVisiblePostsCount] = useState(3); // Initially show 3 posts
+  const [visiblePostsCount, setVisiblePostsCount] = useState(postsToShow); // Initially show 3 posts
   const [scrollPosition, setScrollPosition] = useState<number>(0);
   const [totalPosts, setTotalPosts] = useState<number>(0);
+  const [postData, setPostData] = useState<Post | null>(null); // New state for specific post data
 
   useEffect(() => {
     fetch(`${apiUrl}/wp-json/wp/v2/posts?per_page=1`)
@@ -39,22 +42,21 @@ function WordPressFeed() {
   }, []);
 
   useEffect(() => {
-    fetch(
-      `${apiUrl}/wp-json/wp/v2/posts?page=${pageNumber}&per_page=${pageSize}`
-    )
-      .then((response) => response.json())
-      .then((data) => {
-        if (pageNumber === 1) {
-          setPosts(data);
-        } else {
-          setPosts([...posts, ...data]);
-        }
+    const fetchPosts = async () => {
+      try {
+        const response = await fetch(
+          `${apiUrl}/wp-json/wp/v2/posts?page=${postsPageNumber}&per_page=${pageSize}`
+        );
+        const data = await response.json();
+        setPosts((prevPosts) => [...prevPosts, ...data]); // Append new data to existing posts
         setLoading(false);
-      })
-      .catch((error) => {
-        setError(error.message);
+      } catch (error) {
+        // setError(error.message);
         setLoading(false);
-      });
+      }
+    };
+
+    fetchPosts();
   }, [pageNumber]);
 
   useEffect(() => {
@@ -63,8 +65,10 @@ function WordPressFeed() {
     if (postId && !isNaN(parseInt(postId))) {
       setSelectedPostId(postId);
       // Check if the post is already in the state
-      const postExists = posts.some((post) => post.id.toString() === postId);
-      if (!postExists) {
+      const selectedPost = posts.find((post) => post.id.toString() === postId);
+      if (selectedPost) {
+        setPostData(selectedPost); // Set the specific post data from existing posts
+      } else {
         setFetchingSpecificPost(true);
         fetch(`${apiUrl}/wp-json/wp/v2/posts/${postId}`)
           .then((response) => {
@@ -75,7 +79,7 @@ function WordPressFeed() {
             return response.json();
           })
           .then((data) => {
-            setPosts([data, ...posts]); // Add the fetched post to the beginning of the list
+            setPostData(data); // Set the specific post data
             setFetchingSpecificPost(false);
           })
           .catch((error) => {
@@ -85,7 +89,8 @@ function WordPressFeed() {
       }
     } else {
       setSelectedPostId(null);
-      setVisiblePostsCount(3); // Reset visiblePostsCount when returning to feed
+      // setVisiblePostsCount(postsToShow); // Reset visiblePostsCount when returning to feed
+      setPostData(null); // Clear postData when not viewing a specific post
     }
   }, [posts]); // Added dependency on posts
 
@@ -96,7 +101,8 @@ function WordPressFeed() {
       const postId = urlParams.get("p");
       setSelectedPostId(postId);
       if (!postId) {
-        setVisiblePostsCount(3); // Reset visiblePostsCount when returning to feed
+        // setVisiblePostsCount(postsToShow); // Reset visiblePostsCount when returning to feed
+        setPostData(null); // Clear postData when not viewing a specific post
       }
     };
 
@@ -109,21 +115,16 @@ function WordPressFeed() {
 
   useEffect(() => {
     // Update document title and meta description based on selectedPostId
-    if (selectedPostId) {
-      let selectedPost = posts.find(
-        (post) => post.id.toString() === selectedPostId
+    if (selectedPostId && postData) {
+      document.title = `${postData.title.rendered} - WordPress Feed`;
+      const metaDescription = document.querySelector(
+        'meta[name="description"]'
       );
-      if (selectedPost) {
-        document.title = `${selectedPost.title.rendered} - WordPress Feed`;
-        const metaDescription = document.querySelector(
-          'meta[name="description"]'
+      if (metaDescription) {
+        metaDescription.setAttribute(
+          "content",
+          postData.excerpt.rendered.replace(/<[^>]*>/g, "")
         );
-        if (metaDescription) {
-          metaDescription.setAttribute(
-            "content",
-            selectedPost.excerpt.rendered.replace(/<[^>]*>/g, "")
-          );
-        }
       }
     } else {
       document.title = "WordPress Feed";
@@ -137,7 +138,7 @@ function WordPressFeed() {
         );
       }
     }
-  }, [selectedPostId, posts]);
+  }, [selectedPostId, postData]);
 
   const handleReadMoreClick = (
     e: React.MouseEvent<HTMLAnchorElement>,
@@ -148,6 +149,24 @@ function WordPressFeed() {
     window.scrollTo(0, 0); // Scroll to top
     window.history.pushState({}, "", `?p=${id}`);
     setSelectedPostId(id);
+
+    // Check if the post is already in the state
+    const selectedPost = posts.find((post) => post.id.toString() === id);
+    if (selectedPost) {
+      setPostData(selectedPost); // Set the specific post data from existing posts
+    } else {
+      setFetchingSpecificPost(true);
+      fetch(`${apiUrl}/wp-json/wp/v2/posts/${id}`)
+        .then((response) => response.json())
+        .then((data) => {
+          setPostData(data); // Set the specific post data
+          setFetchingSpecificPost(false);
+        })
+        .catch((error) => {
+          setError(error.message);
+          setFetchingSpecificPost(false);
+        });
+    }
   };
 
   const handleReturnToFeedClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -161,28 +180,19 @@ function WordPressFeed() {
 
   if (loading || fetchingSpecificPost) return <div>Loading...</div>;
 
-  if (selectedPostId) {
-    let selectedPost = posts.find(
-      (post) => post.id.toString() === selectedPostId
-    );
-
-    // Handle the case where selectedPost is undefined
-    if (!selectedPost) {
-      return <div>Post not found</div>;
-    }
-
+  if (selectedPostId && postData) {
     return (
       <div className="wordpress-post flex flex-col gap-4 p-6 max-w-screen-sm m-auto">
         <h1 className="text-4xl text-blue-600 font-bold">
-          {selectedPost.title.rendered}
+          {postData.title.rendered}
         </h1>
         <p className="text-sm text-gray-600 mt-2 mb-2">
-          {new Date(selectedPost.date).toLocaleDateString()}
+          {new Date(postData.date).toLocaleDateString()}
         </p>
         <div
           className="space-y-4"
           dangerouslySetInnerHTML={{
-            __html: selectedPost.content.rendered,
+            __html: postData.content.rendered,
           }}
         />
         <div>
@@ -198,7 +208,7 @@ function WordPressFeed() {
     );
   }
 
-  const visiblePosts = posts.slice(0, visiblePostsCount);
+  let visiblePosts = posts.slice(0, visiblePostsCount);
 
   return (
     <div className="wordpress-feed flex flex-col gap-4 p-6 max-w-screen-sm m-auto">
@@ -231,9 +241,28 @@ function WordPressFeed() {
         <div className="p-6">
           <button
             onClick={() => {
-              setVisiblePostsCount(visiblePostsCount + 3);
-              if (posts.length <= visiblePostsCount + 3) {
-                setPageNumber(pageNumber + 1);
+              pageSize = postsToShow;
+              postsPageNumber = postsPageNumber + postsToShowAdjust + 1;
+              console.log(`postsPageNumber`, postsPageNumber);
+              postsToShowAdjust = 0;
+
+              console.log(
+                "PRE visiblePostsCount",
+                visiblePostsCount,
+                `posts.length`,
+                posts.length
+              );
+              setVisiblePostsCount(visiblePostsCount + postsToShow);
+              console.log(
+                "visiblePostsCount",
+                visiblePostsCount,
+                `posts.length`,
+                posts.length,
+                `totalPosts`,
+                totalPosts
+              );
+              if (totalPosts > posts.length) {
+                setPageNumber(postsPageNumber + 1);
               }
             }}
             className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
